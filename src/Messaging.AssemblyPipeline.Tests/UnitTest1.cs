@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -12,18 +11,18 @@ namespace Messaging.AssemblyPipeline.Tests
             var pipeline = new AssemblyPipeline<int>();
 
             pipeline.WithMiddleware<IncrementDelayMiddleware>();
-            pipeline.WithMiddleware(new IncrementDelayMiddleware());
-            pipeline.WithMiddleware(new IncrementDelayMiddleware());
-            pipeline.WithMiddleware((context, next) => next.Invoke(context+5));
-            pipeline.WithMiddleware(new IncrementDelayMiddleware());
+            pipeline.WithMiddleware<IncrementDelayMiddleware>();
+            pipeline.WithMiddleware<IncrementDelayMiddleware>();
+            pipeline.WithMiddleware((context, next) => next.InvokeAsync(context + 5));
+            pipeline.WithMiddleware<IncrementDelayMiddleware>();
 
             var task1 = pipeline.InvokeAsync(0);
 
-            pipeline.WithMiddleware(new IncrementDelayMiddleware());
-            pipeline.WithMiddleware(new IncrementDelayMiddleware());
-            pipeline.WithMiddleware(new IncrementDelayMiddleware());
-            pipeline.WithMiddleware(new IncrementDelayMiddleware());
-            pipeline.WithMiddleware((context, next) => next.Invoke(context + 3));
+            pipeline.WithMiddleware<IncrementDelayMiddleware>();
+            pipeline.WithMiddleware<IncrementDelayMiddleware>();
+            pipeline.WithMiddleware<IncrementDelayMiddleware>();
+            pipeline.WithMiddleware<IncrementDelayMiddleware>();
+            pipeline.WithMiddleware((context, next) => next.InvokeAsync(context + 3));
 
             var task2 = pipeline.InvokeAsync(0);
 
@@ -40,12 +39,12 @@ namespace Messaging.AssemblyPipeline.Tests
         {
             var pipeline = new AssemblyPipeline<int>();
 
-            pipeline.WithMiddleware<PassthroughMiddleware>();
+            pipeline.WithMiddleware(new PassthroughMiddleware());
             pipeline.WithMiddleware(new DivideAfterMiddleware());
-            pipeline.WithMiddleware<PassthroughMiddleware>();
+            pipeline.WithMiddleware(new PassthroughMiddleware());
             pipeline.WithMiddleware(new MultiplyBeforeMiddleware());
-            pipeline.WithMiddleware(new MultiplyAfterMiddleware());
-            pipeline.WithMiddleware<PassthroughMiddleware>();
+            pipeline.WithMiddleware<MultiplyAfterMiddleware>();
+            pipeline.WithMiddleware(new PassthroughMiddleware());
             pipeline.WithMiddleware(new DivideAfterMiddleware());
             pipeline.WithMiddleware(new PassthroughMiddleware());
 
@@ -55,62 +54,67 @@ namespace Messaging.AssemblyPipeline.Tests
         }
 
 
-        private class IncrementDelayMiddleware : IMiddleware<int>
+        private class IncrementDelayMiddleware : Middleware<int>
         {
-
-            public async Task<int> InvokeAsync(int context, MiddlewareDelegate<int> next)
+            public IncrementDelayMiddleware(IMiddleware<int> next) : base(next)
             {
-                var result = await next.Invoke(++context);
+            }
+
+            public override async Task<int> InvokeAsync(int context)
+            {
+                var result = await Next.InvokeAsync(++context);
 
                 await Task.Delay(context * 10);
 
                 return result;
             }
-
         }
 
-        private class MultiplyBeforeMiddleware : IMiddleware<int>
+        private class MultiplyBeforeMiddleware : IInstanceMiddleware<int>
         {
 
-            public async Task<int> InvokeAsync(int context, MiddlewareDelegate<int> next)
+            public async Task<int> InvokeAsync(int context, IMiddleware<int> next)
             {
                 context *= 3;
 
-                return await next.Invoke(context);
+                return await next.InvokeAsync(context);
             }
 
         }
 
-        private class DivideAfterMiddleware : IMiddleware<int>
+        private class DivideAfterMiddleware : IInstanceMiddleware<int>
         {
 
-            public async Task<int> InvokeAsync(int context, MiddlewareDelegate<int> next)
-            { 
-                var result = await next.Invoke(context);
+            public async Task<int> InvokeAsync(int context, IMiddleware<int> next)
+            {
+                var result = await next.InvokeAsync(context);
 
                 return result / 2;
             }
 
         }
 
-        private class MultiplyAfterMiddleware : IMiddleware<int>
+        private class MultiplyAfterMiddleware : Middleware<int>
         {
-
-            public async Task<int> InvokeAsync(int context, MiddlewareDelegate<int> next)
+            public MultiplyAfterMiddleware(IMiddleware<int> next) : base(next)
             {
-                var result = await next.Invoke(context);
+            }
+
+            public override async Task<int> InvokeAsync(int context)
+            {
+                var result = await Next.InvokeAsync(context);
 
                 return result * 3;
             }
 
         }
 
-        private class PassthroughMiddleware : IMiddleware<int>
+        private class PassthroughMiddleware : IInstanceMiddleware<int>
         {
 
-            public async Task<int> InvokeAsync(int context, MiddlewareDelegate<int> next)
+            public async Task<int> InvokeAsync(int context, IMiddleware<int> next)
             {
-                return await next.Invoke(context);
+                return await next.InvokeAsync(context);
             }
 
         }

@@ -4,42 +4,48 @@ using System.Threading.Tasks;
 namespace Messaging.AssemblyPipeline
 {
 
-    public delegate Task<TContext> MiddlewareDelegate<TContext>(TContext context);
-
     public class AssemblyPipeline<TContext> : IAssemblyPipeline<TContext>
     {
 
-        protected MiddlewareDelegate<TContext> Outer { get; set; }
+        protected IMiddleware<TContext> Outer { get; set; }
 
         public AssemblyPipeline()
         {
-            Outer = context => new FinalMiddleware().InvokeAsync(context, null);
+            Outer = new FinalMiddleware();
         }
 
         public virtual AssemblyPipeline<TContext> WithMiddleware<TMiddleware>()
-            where TMiddleware : IMiddleware<TContext>, new()
+            where TMiddleware : IMiddleware<TContext>
         {
-            return WithMiddleware(new TMiddleware());
-        }
-
-        public virtual AssemblyPipeline<TContext> WithMiddleware(IMiddleware<TContext> middleware)
-        {
-            if (middleware == null)
-                throw new ArgumentNullException(nameof(middleware));
-
-            return WithMiddleware(middleware.InvokeAsync);
-        }
-
-        public virtual AssemblyPipeline<TContext> WithMiddleware(Func<TContext, MiddlewareDelegate<TContext>, Task<TContext>> middleware)
-        {
-            if (middleware == null)
-                throw new ArgumentNullException(nameof(middleware));
-
             var next = Outer;
+            var constructor = typeof(TMiddleware).GetConstructor(new Type[] { typeof(IMiddleware<TContext>) });
 
-            Outer = new MiddlewareDelegate<TContext>(context => middleware.Invoke(context, next));
+            Outer = constructor.Invoke(new object[] { next }) as IMiddleware<TContext>;
 
             return this;
+        }
+
+        public virtual AssemblyPipeline<TContext> WithMiddleware(IInstanceMiddleware<TContext> middleware)
+        {
+            var next = Outer;
+
+            Outer = new InstanceMiddleware<TContext>(middleware, next);
+
+            return this;
+        }
+
+        public AssemblyPipeline<TContext> WithMiddleware(Func<TContext, IMiddleware<TContext>, Task<TContext>> middleware)
+        {
+            var next = Outer;
+
+            Outer = new AnonymousMiddleware<TContext>(next, middleware);
+
+            return this;
+        }
+
+        public AssemblyPipeline<TContext> WithMiddleware(Func<TContext, IMiddleware<TContext>, TContext> middleware)
+        {
+            return WithMiddleware((context, next) => Task.FromResult(middleware.Invoke(context, next)));
         }
 
         public virtual Task<TContext> InvokeAsync(TContext context)
@@ -47,15 +53,17 @@ namespace Messaging.AssemblyPipeline
             if (Outer == null)
                 return Task.FromResult(context);
 
-            return Outer.Invoke(context);
+            return Outer.InvokeAsync(context);
         }
 
         protected class FinalMiddleware : IMiddleware<TContext>
         {
-            public Task<TContext> InvokeAsync(TContext context, MiddlewareDelegate<TContext> next)
+
+            public Task<TContext> InvokeAsync(TContext context)
             {
                 return Task.FromResult(context);
             }
+
         }
 
         #region IDisposable Support

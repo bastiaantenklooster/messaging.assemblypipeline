@@ -6,7 +6,7 @@ namespace Messaging.AssemblyPipeline
     public interface IMiddleware<TContext>
     {
 
-        Task<TContext> InvokeAsync(TContext context, MiddlewareDelegate<TContext> next);
+        Task<TContext> InvokeAsync(TContext context);
 
     }
 

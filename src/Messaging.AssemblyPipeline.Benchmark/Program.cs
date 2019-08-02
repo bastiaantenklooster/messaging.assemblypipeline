@@ -10,36 +10,13 @@ namespace Messaging.AssemblyPipeline.Benchmark
         {
             var sw = new Stopwatch();
 
-            var pipeline = new AssemblyPipeline<string>();
-            
+            var pipeline = new AssemblyPipeline<int>();
+
             sw.Start();
 
-            for (int i = 0; i < 1000; i++)
-            {      
-                pipeline.WithMiddleware(new IncrementMiddleware());
-            }
-
-            sw.Stop();
-
-            Console.WriteLine("Adding middleware took {0}", sw.ElapsedTicks);
-
-            sw.Restart();
-
-            _ = await pipeline.InvokeAsync("");
-
-            sw.Stop();
-
-            Console.WriteLine("Getting took {0}", sw.ElapsedTicks);
-
-            pipeline.Dispose();            
-
-            var pipeline2 = new AssemblyPipeline<string>();
-
-            sw.Restart();
-
-            for (int i = 0; i < 1000; i++)
+            for (var i = 0; i < 10000; i++)
             {
-                pipeline2.WithMiddleware((context, next) => next.Invoke(context + "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world"));
+                pipeline.WithMiddleware<IncrementMiddleware>();
             }
 
             sw.Stop();
@@ -48,23 +25,28 @@ namespace Messaging.AssemblyPipeline.Benchmark
 
             sw.Restart();
 
-            _ = await pipeline2.InvokeAsync("");
+            var res = await pipeline.InvokeAsync(0);
 
             sw.Stop();
 
-            Console.WriteLine("Getting took {0}", sw.ElapsedTicks);
+            Console.WriteLine("Getting {1} took {0}", sw.ElapsedTicks, res);
 
-            pipeline2.Dispose();
+            pipeline.Dispose();
 
             Console.ReadKey(false);
         }
 
 
-        private class IncrementMiddleware : IMiddleware<string>
+        private class IncrementMiddleware : Middleware<int>
         {
-            public async Task<string> InvokeAsync(string context, MiddlewareDelegate<string> next)
+
+            public IncrementMiddleware(IMiddleware<int> next) : base(next)
             {
-                return await next.Invoke(context + "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world");
+            }
+
+            public override Task<int> InvokeAsync(int context)
+            {
+                return Next.InvokeAsync(++context);
             }
         }
 

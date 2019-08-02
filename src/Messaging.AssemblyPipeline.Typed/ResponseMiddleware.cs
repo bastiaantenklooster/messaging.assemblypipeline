@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Messaging.AssemblyPipeline.Typed
 {
-    class ResponseMiddleware : IMiddleware<Context>
+    class ResponseMiddleware : IInstanceMiddleware<Context>
     {
 
         private Dictionary<Type, Type> AllowedResponses { get; } = new Dictionary<Type, Type>();
@@ -15,10 +15,10 @@ namespace Messaging.AssemblyPipeline.Typed
             AllowedResponses.TryAdd(typeof(TRequest), typeof(TResponse));
         }
 
-        public Task<Context> InvokeAsync(Context context, MiddlewareDelegate<Context> next)
+        public Task<Context> InvokeAsync(Context context, IMiddleware<Context> next)
         {
             if (context.Response == null)
-                return next(context);
+                return next.InvokeAsync(context);
 
             var requestType = context.Request.GetType();
             var responseTypeAllowed = AllowedResponses.GetValueOrDefault(requestType);
@@ -26,7 +26,7 @@ namespace Messaging.AssemblyPipeline.Typed
             if (responseTypeAllowed != null && !responseTypeAllowed.IsInstanceOfType(context.Response))
                 throw new InvalidOperationException("Invalid response type.");
 
-            return next(context);
+            return next.InvokeAsync(context);
         }
 
     }
